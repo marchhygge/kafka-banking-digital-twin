@@ -1,0 +1,53 @@
+# Workflow name displayed under the "Actions" tab on GitHub
+name: CI Quality Gate for Dev
+
+# Trigger: Automatically run when a Pull Request targets the "dev" or "main" branch
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+
+jobs:
+  # IMPORTANT: "ci-quality-gate" is the Job ID.
+  # Search for this exact name when configuring Required Status Checks in Branch Protection!
+  ci-quality-gate:
+    runs-on: ubuntu-latest # Virtual machine environment for running the checks
+
+    steps:
+      # Step 1: Checkout the source code from the Pull Request branch
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      # Step 2: Ensure no unresolved Git merge conflict markers were accidentally committed
+      - name: Check for unresolved Git merge conflicts
+        run: |
+          echo "Checking for unresolved Git merge conflict markers..."
+          if grep -rnE "^(<<<<<<<|=======|>>>>>>>)" --exclude-dir=.git --exclude=ci-dev.yml . ; then
+            echo "ERROR: Unresolved Git merge conflict markers detected!"
+            exit 1
+          fi
+          echo "Success: No unresolved merge conflicts found."
+
+      # Step 3: Validate Docker Compose configuration syntax (if present in the repo)
+      - name: Validate docker-compose.yml (if present)
+        run: |
+          if [ -f "docker-compose.yml" ] || [ -f "docker-compose.yaml" ]; then
+            echo "Validating Docker Compose configuration syntax..."
+            docker compose config -q
+            echo "Success: Docker Compose configuration is valid."
+          else
+            echo "Info: No docker-compose.yml found, skipping validation."
+          fi
+
+      # Step 4: Check Python files for syntax errors (if present in the repo)
+      - name: Check Python syntax errors (if present)
+        run: |
+          PY_FILES=$(find . -name "*.py" -not -path "./.venv/*" -not -path "./venv/*")
+          if [ -n "$PY_FILES" ]; then
+            echo "Checking Python files for syntax errors..."
+            python3 -m py_compile $PY_FILES
+            echo "Success: All Python files compiled without syntax errors."
+          else
+            echo "Info: No Python files found, skipping syntax check."
+          fi
