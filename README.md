@@ -1,84 +1,81 @@
 # Kafka Banking Digital Twin
 
-Real-time banking digital twin streaming and event processing platform powered by Apache Kafka.
+Real-time banking digital twin streaming and event processing platform powered by **Apache Kafka**.
 
 ---
 
-## Git Workflow & Branching Strategy
+## 1. High-Level Architecture & Data Flow
 
-This repository enforces a strict **3-tier branching model** combined with automated **GitHub Actions Quality Gates** and **Branch Protection Rules** to keep `dev` and `main` clean, stable, and deployable at all times.
+The platform simulates a live retail banking ecosystem (customers, behavioural decisions, accounts, payments, lending, digital channels, and fraud patterns) and streams domain events in real time through Apache Kafka to downstream processing consumers.
 
 ```mermaid
 flowchart LR
-    A["Personal / Feature Branch<br/>(e.g., marchHygge)"] -->|"Pull Request"| G1{"CI Quality Gate<br/>(ci-quality-gate)"}
-    G1 -->|"Pass"| B["dev<br/>(Integration / Staging)"]
-    B -->|"Pull Request"| G2{"Enforce Dev to Main + CI<br/>(check-source-branch + ci-quality-gate)"}
-    G2 -->|"Pass"| C["main<br/>(Production)"]
+    subgraph SIM["1. Banking Twin Simulator (Python)"]
+        BOOT["Bootstrap Reference & Customer State"]
+        TICK["Real-Time Tick Loop & Behavioural Agents"]
+        BOOT --> TICK
+    end
+
+    subgraph KAFKA["2. Apache Kafka Backbone (Docker KRaft)"]
+        SR["Schema Registry (Avro / JSON)"]
+        TOPICS["Domain Topics (bdt.*.v1)"]
+    end
+
+    subgraph CONS["3. Downstream Consumers & Storage"]
+        FRAUD["Real-Time Fraud Detector"]
+        SINK["Core Banking DB / Lakehouse Sink"]
+        UI["Kafka UI Monitoring"]
+    end
+
+    TICK -->|"Publish Events"| TOPICS
+    TICK -.->|"Validate Contracts"| SR
+    TOPICS --> FRAUD
+    FRAUD -->|"Emit Fraud Alerts"| TOPICS
+    TOPICS --> SINK
+    TOPICS -.-> UI
 ```
-
-### 1. Branch Roles & Protection Rules
-
-| Branch | Role | Direct Push | Pull Request Required | Required Status Checks | Admin Enforcement |
-| :--- | :--- | :---: | :---: | :--- | :---: |
-| **`main`** | Production-ready source of truth | ❌ Blocked | ✅ Yes | `check-source-branch`, `ci-quality-gate` | ✅ Enforced (`enforce_admins: true`) |
-| **`dev`** | Integration & staging environment | ❌ Blocked | ✅ Yes | `ci-quality-gate` | ✅ Enforced (`enforce_admins: true`) |
-| **`<personal>`** *(e.g. `marchHygge`)* | Individual development & feature work | ✅ Allowed | ❌ No | None (checked upon opening PR to `dev`) | N/A |
 
 ---
 
-## Automated CI/CD Quality Gates (`.github/workflows/`)
+## 2. Repository Structure & Roadmap
 
-### 1. `ci-quality-gateway.yml` (Job: `ci-quality-gate`)
-Triggered automatically on every Pull Request targeting **`dev`** or **`main`**. It blocks broken code before it can be merged:
-- **Merge Conflict Marker Detection:** Fails if unresolved Git conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) are present in any tracked file.
-- **Docker Compose Validation:** Runs `docker compose config -q` when `docker-compose.yml` / `docker-compose.yaml` is present.
-- **Python Syntax Compilation:** Runs `python3 -m py_compile` across all `.py` files when Python source files are present.
-
-### 2. `restrict-main.yml` (Job: `check-source-branch`)
-Triggered automatically on every Pull Request targeting **`main`**:
-- Verifies that `github.head_ref == "dev"`.
-- **Blocks any Pull Request into `main` that does not originate from the `dev` branch.**
+```text
+kafka-banking-digital-twin/
+├── .github/workflows/       # ✅ Automated CI Quality Gate & Branch Protection
+├── docs/                    # ✅ Detailed engineering & workflow documentation
+│   └── git-workflow.md      #    Step-by-step Git branching & CI/CD guide
+├── docker-compose.yml       # 🚧 [Planned] Kafka (KRaft), Schema Registry, Kafka UI, PostgreSQL
+├── schemas/                 # 🚧 [Planned] Avro (.avsc) & JSON event contracts
+├── ddl/postgresql/          # 🚧 [Planned] Core banking relational schemas
+├── simulator/               # 🚧 [Planned] Real-time banking event generator & Kafka producer
+└── consumers/               # 🚧 [Planned] Real-time fraud detection & persistence consumers
+```
 
 ---
 
-## Step-by-Step Developer Guide
+## 3. Getting Started
 
-### 1. Starting New Work (Sync from `main`)
-Always start new features from an up-to-date personal branch synced with `main`:
+> *🚧 Upcoming: Instructions for starting the local Kafka KRaft cluster (`docker compose up -d`), registering schemas, and running the real-time simulator will be added as each module is implemented.*
 
-```bash
-git checkout marchHygge
-git pull origin main
+---
+
+## 4. Git Workflow & CI/CD Overview
+
+All contributions follow a strict **3-tier promotion flow** enforced by GitHub Actions:
+
+```mermaid
+flowchart LR
+    A["Personal Branch (e.g., marchHygge)"] -->|"PR + ci-quality-gate"| B["dev (Integration)"]
+    B -->|"PR + check-source-branch + ci-quality-gate"| C["main (Production)"]
 ```
 
-### 2. Committing & Pushing to Your Personal Branch
-Develop and test locally, then push changes to your personal branch:
+- **Flow:** `<personal-branch>` $\rightarrow$ **`dev`** $\rightarrow$ **`main`** (Direct pushes to `dev`/`main` and PRs to `main` from non-`dev` branches are blocked).
+- **Automated Checks:** Every PR automatically validates merge conflicts, `docker compose config -q`, and `python3 -m py_compile`.
+- 📖 **Full Guide:** See **[docs/git-workflow.md](./docs/git-workflow.md)** for branch protection details, commands, and conflict resolution steps.
 
-```bash
-git add .
-git commit -m "feat: describe your change clearly"
-git push origin marchHygge
-```
+---
 
-### 3. Merging into `dev` (Integration & Testing)
-1. Open a Pull Request on GitHub: **base: `dev`** $\leftarrow$ **compare: `marchHygge`**.
-2. Wait for **`CI Quality Gate / ci-quality-gate`** to pass ✅.
-3. If the check fails ❌, fix the errors locally on `marchHygge` and push again—the PR will automatically re-run the check.
-4. Once all checks pass, click **Merge pull request**.
+## 5. Documentation (`docs/`)
 
-> **Handling Merge Conflicts with `dev`:**
-> Only pull from `dev` into your personal branch when you need a teammate's integrated changes or need to resolve a merge conflict with `dev`:
-> ```bash
-> git checkout marchHygge
-> git pull origin dev
-> # Resolve any conflicts, then commit and push:
-> git add .
-> git commit -m "chore: resolve merge conflicts with dev"
-> git push origin marchHygge
-> ```
-
-### 4. Releasing to `main` (Production)
-Once changes on `dev` are verified and ready for release:
-1. Open a Pull Request on GitHub: **base: `main`** $\leftarrow$ **compare: `dev`**.
-2. Wait for both required checks (**`check-source-branch`** and **`ci-quality-gate`**) to pass ✅.
-3. Click **Merge pull request**.
+- **[Git Workflow & CI/CD Quality Gates](./docs/git-workflow.md)** — Detailed branching rules, automated checks, and developer step-by-step commands.
+- *More technical documentation (Kafka Topic Contracts, Simulator Configuration, Consumer Architecture) will be added to [`docs/`](./docs/) as development progresses.*
