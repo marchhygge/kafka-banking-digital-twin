@@ -1,0 +1,17 @@
+name: Enforce Dev to Main
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-source-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if source is dev
+        run: |
+          if [[ "${{ github.head_ref }}" != "dev" ]]; then
+            echo "ERROR: Pull Requests to 'main' are only allowed from the 'dev' branch!"
+            exit 1
+          fi
+          echo "Success: Source branch is dev."
