@@ -1,5 +1,5 @@
 # Workflow name displayed under the "Actions" tab on GitHub
-name: CI Quality Gate for Dev
+name: CI Quality Gate
 
 # Trigger: Automatically run when a Pull Request targets the "dev" or "main" branch
 on:
@@ -17,13 +17,13 @@ jobs:
     steps:
       # Step 1: Checkout the source code from the Pull Request branch
       - name: Checkout source code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Step 2: Ensure no unresolved Git merge conflict markers were accidentally committed
       - name: Check for unresolved Git merge conflicts
         run: |
           echo "Checking for unresolved Git merge conflict markers..."
-          if grep -rnE "^(<<<<<<<|=======|>>>>>>>)" --exclude-dir=.git --exclude=ci-dev.yml . ; then
+          if grep -rnE "^(<<<<<<<|=======|>>>>>>>)" --exclude-dir=.git --exclude=ci-quality-gate.yml . ; then
             echo "ERROR: Unresolved Git merge conflict markers detected!"
             exit 1
           fi
