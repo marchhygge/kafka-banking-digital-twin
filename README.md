@@ -1,1 +1,1 @@
-# kafka-banking-digital-twin-
+# kafka-banking-digital-twin
